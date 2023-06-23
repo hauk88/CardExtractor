@@ -49,16 +49,36 @@ def extract_card(image):
     return image
 
 
-def find_cross(p1,p2,q1,q2):
-    pdiff = (p1-p2).T
-    qdiff = (q1-q2).T
+def find_cross2(p1,p2,q1,q2):
+    pdiff = p1-p2
+    qdiff = q1-q2
 
-    A = np.array([pdiff, -qdiff])
+    A = np.array([pdiff, -qdiff]).T
     b = q2-p2
 
     t = np.linalg.solve(A,b)
 
-    x = p2 + t*pdiff
+    x = p2 + t[0]*pdiff
+
+    return x
+
+def find_cross(p1,p2,q1,q2):
+    # p(t) = a*t + b
+    a = p1-p2
+    b = p2
+
+    # q(t) = c*t + d
+    c = q1-q2
+    d = q2
+
+    # Solve p(t1) = q(t2), i.e. At = bm
+    A = np.array([a, -c]).T
+    bm = d-b
+
+    t = np.linalg.solve(A,bm)
+
+    # Calculate point using p(t1)
+    x = a*t[0] + b
 
     return x
 
@@ -146,3 +166,15 @@ if __name__ == '__main__':
     img = extract_card(Image.open(path))
 
     img.save('test.png')
+
+
+    p1 = np.array([1,1])
+    p2 = np.array([3,1])
+    q1 = np.array([0,2])
+    q2 = np.array([0,4])
+
+    
+    print(find_cross(p1,p2,q1,q2))
+
+    p2 = np.array([3,0])
+    print(find_cross(p1,p2,q1,q2))
