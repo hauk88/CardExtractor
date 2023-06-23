@@ -1,6 +1,7 @@
 from pdf2image import convert_from_path
 import logging
 from PIL import Image, ImageFilter, ImageDraw
+import os
 
 def split_pdf_to_pages(path, target):
     # Store Pdf with convert_from_path function
@@ -20,7 +21,7 @@ def split_pdf_to_cards(path, target):
     # Store Pdf with convert_from_path function
     logging.debug(f'reading from path {target}')
 
-    images = convert_from_path(path)
+    images = convert_from_path(path, poppler_path=os.getenv('POPPLER_PATH'))
     logging.debug(f'found {len(images)} pages')
     
     total_count = 0
