@@ -1,9 +1,37 @@
 import numpy as np
 from card_constants import *
-from PIL import Image, ImageFilter, ImageDraw
+from PIL import Image, ImageFilter, ImageDraw, ImageTransform
 
 
 def extract_card(image):
+    img_array = np.array(image, dtype=np.uint8)
+    (left, right) = process_horisontal(img_array)
+    (top, bottom) = process_vertical(img_array)
+
+    top_left = find_cross(left[0], left[1], top[0],top[1])
+    top_right = find_cross(right[0], right[1], top[1],top[0])
+    bottom_left = find_cross(left[1], left[0], bottom[0],bottom[1])
+    bottom_right = find_cross(right[1], right[0], bottom[1],bottom[0])
+
+    w = 420
+    h = 671    
+
+    # Use this https://stackoverflow.com/questions/71724403/crop-an-image-in-pil-using-the-4-points-of-a-rotated-rectangle
+    
+    # Define 8-tuple with x,y coordinates of top-left, bottom-left, bottom-right and top-right corners and apply
+    transform=[*top_left,*bottom_left,*bottom_right, *top_right]
+    tr = [int(x) for x in transform]
+    size = (w,h)
+    print(tr)
+    print(size)
+    result = image.transform(size, ImageTransform.QuadTransform(tr))
+    
+    return result
+
+
+
+
+def extract_card_draw(image):
     img_array = np.array(image, dtype=np.uint8)
     (left, right) = process_horisontal(img_array)
     c_left,c_right = fit_polynomial(left, right)
@@ -41,8 +69,6 @@ def extract_card(image):
                find_cross(right[0], right[1], top[1],top[0]),
                find_cross(left[1], left[0], bottom[0],bottom[1]),
                find_cross(right[1], right[0], bottom[1],bottom[0])]
-
-    print(corners)
 
     draw_points(corners)
     
@@ -162,19 +188,7 @@ def find_line_in_slice(img_slice):
 
 
 if __name__ == '__main__':
-    path = 'img_src\\card_split\\card-1.png'
+    path = 'img_src\\card_split\\card-168.png'
     img = extract_card(Image.open(path))
 
     img.save('test.png')
-
-
-    p1 = np.array([1,1])
-    p2 = np.array([3,1])
-    q1 = np.array([0,2])
-    q2 = np.array([0,4])
-
-    
-    print(find_cross(p1,p2,q1,q2))
-
-    p2 = np.array([3,0])
-    print(find_cross(p1,p2,q1,q2))
