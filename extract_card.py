@@ -3,23 +3,6 @@ from card_constants import *
 from PIL import Image, ImageFilter, ImageDraw, ImageTransform
 from enum import Enum
 
-def rotate(l, n):
-    return l[n:] + l[:n]
-
-def rotate_card(image):
-    ds = [i*0.01 for i in range(100)]
-    for d in ds:
-        r = image.rotate(d)
-        r.save('img_test\\test_r_{:.2f}.png'.format(d))
-    return image
-
-def rotate_card_order(image):
-    d = 0.7
-    for o in [Image.Resampling.NEAREST, Image.Resampling.BILINEAR, Image.Resampling.BICUBIC]:
-        r = image.rotate(d, resample=o)
-        r.save('img_test\\test_r_{:.2f}_o_{:}.png'.format(d,o))
-    return image
-
 def extract_card(image):
     img_array = np.array(image, dtype=np.uint8)
     (left, right) = process_horisontal(img_array, EdgeMode.COLOR)
@@ -109,20 +92,6 @@ def extract_card_draw(image):
     
     return image
 
-
-def find_cross2(p1,p2,q1,q2):
-    pdiff = p1-p2
-    qdiff = q1-q2
-
-    A = np.array([pdiff, -qdiff]).T
-    b = q2-p2
-
-    t = np.linalg.solve(A,b)
-
-    x = p2 + t[0]*pdiff
-
-    return x
-
 def find_cross(p1,p2,q1,q2):
     # p(t) = a*t + b
     a = p1-p2
@@ -160,9 +129,7 @@ def fit_polynomial(p_1, p_2):
 
     return (coef_1, coef_2)
 
-
 def process_horisontal(img_array, mode):
-    # Row 1
     start_h = 18
 
     top_h = 188
@@ -173,7 +140,6 @@ def process_horisontal(img_array, mode):
     horisontal_lines.append(start_h + int(top_h/2))
     horisontal_lines.append(start_h + card_h - int(bottom_h/2))
     return process_horisontal_lines(img_array, horisontal_lines, mode)
-
 
 def process_horisontal_lines(img_array, lines, mode):
     points_left = []
@@ -186,12 +152,7 @@ def process_horisontal_lines(img_array, lines, mode):
 
     return (points_left, points_right)
 
-
-
-
 def process_vertical(img_array,mode):
-    # Row 1
-
     vertical_lines = []
 
     vertical_lines.append(int(card_w/3))
@@ -206,7 +167,6 @@ def process_vertical(img_array,mode):
         points_bottom.append(np.array([px2, line]))
 
     return (points_top, points_bottom)
-
 
 class EdgeMode(Enum):
     COLOR = 1
