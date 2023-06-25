@@ -2,16 +2,47 @@ import numpy as np
 from card_constants import *
 from PIL import Image, ImageFilter, ImageDraw, ImageTransform
 
+def rotate(l, n):
+    return l[n:] + l[:n]
+
+def rotate_card(image):
+    ds = [i*0.01 for i in range(100)]
+    for d in ds:
+        r = image.rotate(d)
+        r.save(f'test_r_{d}.png')
+    return image
 
 def extract_card(image):
     img_array = np.array(image, dtype=np.uint8)
     (left, right) = process_horisontal(img_array)
     (top, bottom) = process_vertical(img_array)
 
-    top_left = find_cross(left[0], left[1], top[0],top[1])
-    top_right = find_cross(right[0], right[1], top[1],top[0])
-    bottom_left = find_cross(left[1], left[0], bottom[0],bottom[1])
-    bottom_right = find_cross(right[1], right[0], bottom[1],bottom[0])
+    def find_cross_t(p1,p2,q1,q2):
+        x = find_cross(p1,p2,q1,q2)
+        return [x[1],x[0]]
+
+    top_left = find_cross_t(left[0], left[1], top[0],top[1])
+    top_right = find_cross_t(right[0], right[1], top[1],top[0])
+    bottom_left = find_cross_t(left[1], left[0], bottom[0],bottom[1])
+    bottom_right = find_cross_t(right[1], right[0], bottom[1],bottom[0])
+
+
+    # top_left = [20,20]
+    # top_right = [200,20]
+    # bottom_left = [20,200]
+    # bottom_right = [200,200]
+
+    img1 = ImageDraw.Draw(image)
+
+    def draw_points(points, color='green'):
+        w = 2
+        for p in points:
+            img1.ellipse((round(p[0])-w, round(p[1])-w,round(p[0])+w,round(p[1])+w), fill=color)
+
+    draw_points([top_left], 'red')
+    draw_points([top_right],'blue')
+    draw_points([bottom_left], 'black')
+    draw_points([bottom_right])
 
     w = 420
     h = 671    
@@ -20,16 +51,13 @@ def extract_card(image):
     
     # Define 8-tuple with x,y coordinates of top-left, bottom-left, bottom-right and top-right corners and apply
     transform=[*top_left,*bottom_left,*bottom_right, *top_right]
-    tr = [int(x) for x in transform]
     size = (w,h)
-    print(tr)
+    
+    print(transform)
     print(size)
-    result = image.transform(size, ImageTransform.QuadTransform(tr))
+    result = image.transform(size, ImageTransform.QuadTransform(transform))
     
     return result
-
-
-
 
 def extract_card_draw(image):
     img_array = np.array(image, dtype=np.uint8)
@@ -189,6 +217,6 @@ def find_line_in_slice(img_slice):
 
 if __name__ == '__main__':
     path = 'img_src\\card_split\\card-168.png'
-    img = extract_card(Image.open(path))
+    img = rotate_card(Image.open(path))
 
     img.save('test.png')
