@@ -1,6 +1,7 @@
 import numpy as np
 from card_constants import *
 from PIL import Image, ImageFilter, ImageDraw, ImageTransform
+from enum import Enum
 
 def rotate(l, n):
     return l[n:] + l[:n]
@@ -21,24 +22,30 @@ def rotate_card_order(image):
 
 def extract_card(image):
     img_array = np.array(image, dtype=np.uint8)
-    (left, right) = process_horisontal(img_array)
-    (top, bottom) = process_vertical(img_array)
+    (left, right) = process_horisontal(img_array, EdgeMode.COLOR)
+    (top, bottom) = process_vertical(img_array, EdgeMode.COLOR)
 
-    d = 5
+    d = 10
     box = [min(left[0][1], left[1][1])-d, 
            min(top[0][0], top[1][0])-d,
            max(right[0][1],right[1][1])+d,
            max(bottom[0][0], bottom[1][0])+d]
     
-    imgw = image.crop(box)
+    image_box = image.crop(box)
 
-    imgw = imgw.convert("L")
+    imgw = image_box.convert("L")
  
     # Detecting Edges on the Image using the argument ImageFilter.FIND_EDGES
     imgw = imgw.filter(ImageFilter.FIND_EDGES)
+    box_1px = [1,1,imgw.size[0]-1, imgw.size[1]-1]
+    imgw = imgw.crop(box_1px)
 
+    img_array = np.array(imgw, dtype=np.uint8)    
+    
+    (left, right) = process_horisontal(img_array, EdgeMode.BW)
+    (top, bottom) = process_vertical(img_array, EdgeMode.BW)
 
-    return imgw
+    image_box = image_box.crop(box_1px)
 
     def find_cross_t(p1,p2,q1,q2):
         x = find_cross(p1,p2,q1,q2)
@@ -47,18 +54,15 @@ def extract_card(image):
     top_left = find_cross_t(left[0], left[1], top[0],top[1])
     top_right = find_cross_t(right[0], right[1], top[1],top[0])
     bottom_left = find_cross_t(left[1], left[0], bottom[0],bottom[1])
-    bottom_right = find_cross_t(right[1], right[0], bottom[1],bottom[0])
-
-    w = 420
-    h = 671    
+    bottom_right = find_cross_t(right[1], right[0], bottom[1],bottom[0])  
 
     # Use this https://stackoverflow.com/questions/71724403/crop-an-image-in-pil-using-the-4-points-of-a-rotated-rectangle
     
     # Define 8-tuple with x,y coordinates of top-left, bottom-left, bottom-right and top-right corners and apply
     transform=[*top_left,*bottom_left,*bottom_right, *top_right]
-    size = (w,h)
+    size = (card_w,card_h)
 
-    result = image.transform(size, ImageTransform.QuadTransform(transform), resample=Image.Resampling.BICUBIC)
+    result = image_box.transform(size, ImageTransform.QuadTransform(transform), resample=Image.Resampling.BICUBIC)
     
     return result
 
@@ -157,7 +161,7 @@ def fit_polynomial(p_1, p_2):
     return (coef_1, coef_2)
 
 
-def process_horisontal(img_array):
+def process_horisontal(img_array, mode):
     # Row 1
     start_h = 18
 
@@ -168,14 +172,15 @@ def process_horisontal(img_array):
 
     horisontal_lines.append(start_h + int(top_h/2))
     horisontal_lines.append(start_h + card_h - int(bottom_h/2))
+    return process_horisontal_lines(img_array, horisontal_lines, mode)
 
 
-def process_horisontal_lines(img_array, lines):
+def process_horisontal_lines(img_array, lines, mode):
     points_left = []
     points_right = []
     for line in lines:
         line_slice = img_array[line, :]
-        (px1,px2) = find_line_in_slice(line_slice)
+        (px1,px2) = find_line_in_slice(line_slice, mode)
         points_left.append(np.array([line, px1]))
         points_right.append(np.array([line, px2]))
 
@@ -184,7 +189,7 @@ def process_horisontal_lines(img_array, lines):
 
 
 
-def process_vertical(img_array):
+def process_vertical(img_array,mode):
     # Row 1
 
     vertical_lines = []
@@ -196,17 +201,23 @@ def process_vertical(img_array):
     points_bottom = []
     for line in vertical_lines:
         line_slice = img_array[:, line]
-        (px1,px2) = find_line_in_slice(line_slice)
+        (px1,px2) = find_line_in_slice(line_slice, mode)
         points_top.append(np.array([px1, line]))
         points_bottom.append(np.array([px2, line]))
 
     return (points_top, points_bottom)
 
 
+class EdgeMode(Enum):
+    COLOR = 1
+    BW = 2
 
-def find_line_in_slice(img_slice):
+def find_line_in_slice(img_slice, mode):
     threshold = 100
-    target_color = np.array(minor_border_color)
+    if(mode == EdgeMode.COLOR):
+        target_color = np.array(minor_border_color)
+    if(mode == EdgeMode.BW):
+        target_color = 255
 
     idx = []
     for i in range(len(img_slice)):
@@ -216,10 +227,8 @@ def find_line_in_slice(img_slice):
         if(d < threshold):
             idx.append(i)
 
-    df = 3
-    dl = 5
-    first = idx[0]-df
-    last = idx[-1]+dl
+    first = idx[0]
+    last = idx[-1]
 
     return (first, last)
 
