@@ -9,13 +9,36 @@ def rotate_card(image):
     ds = [i*0.01 for i in range(100)]
     for d in ds:
         r = image.rotate(d)
-        r.save(f'test_r_{d}.png')
+        r.save('img_test\\test_r_{:.2f}.png'.format(d))
+    return image
+
+def rotate_card_order(image):
+    d = 0.7
+    for o in [Image.Resampling.NEAREST, Image.Resampling.BILINEAR, Image.Resampling.BICUBIC]:
+        r = image.rotate(d, resample=o)
+        r.save('img_test\\test_r_{:.2f}_o_{:}.png'.format(d,o))
     return image
 
 def extract_card(image):
     img_array = np.array(image, dtype=np.uint8)
     (left, right) = process_horisontal(img_array)
     (top, bottom) = process_vertical(img_array)
+
+    d = 5
+    box = [min(left[0][1], left[1][1])-d, 
+           min(top[0][0], top[1][0])-d,
+           max(right[0][1],right[1][1])+d,
+           max(bottom[0][0], bottom[1][0])+d]
+    
+    imgw = image.crop(box)
+
+    imgw = imgw.convert("L")
+ 
+    # Detecting Edges on the Image using the argument ImageFilter.FIND_EDGES
+    imgw = imgw.filter(ImageFilter.FIND_EDGES)
+
+
+    return imgw
 
     def find_cross_t(p1,p2,q1,q2):
         x = find_cross(p1,p2,q1,q2)
@@ -26,24 +49,6 @@ def extract_card(image):
     bottom_left = find_cross_t(left[1], left[0], bottom[0],bottom[1])
     bottom_right = find_cross_t(right[1], right[0], bottom[1],bottom[0])
 
-
-    # top_left = [20,20]
-    # top_right = [200,20]
-    # bottom_left = [20,200]
-    # bottom_right = [200,200]
-
-    img1 = ImageDraw.Draw(image)
-
-    def draw_points(points, color='green'):
-        w = 2
-        for p in points:
-            img1.ellipse((round(p[0])-w, round(p[1])-w,round(p[0])+w,round(p[1])+w), fill=color)
-
-    draw_points([top_left], 'red')
-    draw_points([top_right],'blue')
-    draw_points([bottom_left], 'black')
-    draw_points([bottom_right])
-
     w = 420
     h = 671    
 
@@ -52,10 +57,8 @@ def extract_card(image):
     # Define 8-tuple with x,y coordinates of top-left, bottom-left, bottom-right and top-right corners and apply
     transform=[*top_left,*bottom_left,*bottom_right, *top_right]
     size = (w,h)
-    
-    print(transform)
-    print(size)
-    result = image.transform(size, ImageTransform.QuadTransform(transform))
+
+    result = image.transform(size, ImageTransform.QuadTransform(transform), resample=Image.Resampling.BICUBIC)
     
     return result
 
@@ -153,6 +156,7 @@ def fit_polynomial(p_1, p_2):
 
     return (coef_1, coef_2)
 
+
 def process_horisontal(img_array):
     # Row 1
     start_h = 18
@@ -165,15 +169,20 @@ def process_horisontal(img_array):
     horisontal_lines.append(start_h + int(top_h/2))
     horisontal_lines.append(start_h + card_h - int(bottom_h/2))
 
+
+def process_horisontal_lines(img_array, lines):
     points_left = []
     points_right = []
-    for line in horisontal_lines:
+    for line in lines:
         line_slice = img_array[line, :]
         (px1,px2) = find_line_in_slice(line_slice)
         points_left.append(np.array([line, px1]))
         points_right.append(np.array([line, px2]))
 
     return (points_left, points_right)
+
+
+
 
 def process_vertical(img_array):
     # Row 1
@@ -217,6 +226,6 @@ def find_line_in_slice(img_slice):
 
 if __name__ == '__main__':
     path = 'img_src\\card_split\\card-168.png'
-    img = rotate_card(Image.open(path))
+    img = extract_card(Image.open(path))
 
     img.save('test.png')
