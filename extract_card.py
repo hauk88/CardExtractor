@@ -9,10 +9,18 @@ def extract_card(image):
     (top, bottom) = process_vertical(img_array, EdgeMode.COLOR)
 
     d = 10
-    box = [min(left[0][1], left[1][1])-d, 
-           min(top[0][0], top[1][0])-d,
-           max(right[0][1],right[1][1])+d,
-           max(bottom[0][0], bottom[1][0])+d]
+
+    left_x = [l[0] for l in left]
+    rigt_x = [l[0] for l in right]
+
+    top_y = [l[1] for l in top]
+    bottom_y = [l[1] for l in bottom]
+    
+
+    box = [min(left_x)-d, 
+           min(top_y)-d,
+           max(rigt_x)+d,
+           max(bottom_y)+d]
     
     image_box = image.crop(box)
 
@@ -28,16 +36,30 @@ def extract_card(image):
     (left, right) = process_horisontal(img_array, EdgeMode.BW)
     (top, bottom) = process_vertical(img_array, EdgeMode.BW)
 
+    img_test = imgw.convert('RGB')
+
+    img1 = ImageDraw.Draw(img_test)
+
+    def draw_points(points):
+        w = 2
+        for p in points:
+            img1.ellipse((round(p[0])-w, round(p[1])-w,round(p[0])+w,round(p[1])+w), fill='green')
+    
+    draw_points(left)
+    draw_points(right)
+    draw_points(top)
+    draw_points(bottom)
+    return img_test
+
     image_box = image_box.crop(box_1px)
 
-    def find_cross_t(p1,p2,q1,q2):
-        x = find_cross(p1,p2,q1,q2)
-        return [x[1],x[0]]
+    top_left = find_cross(left[0], left[1], top[0],top[1])
+    top_right = find_cross(right[0], right[1], top[1],top[0])
+    bottom_left = find_cross(left[1], left[0], bottom[0],bottom[1])
+    bottom_right = find_cross(right[1], right[0], bottom[1],bottom[0])
 
-    top_left = find_cross_t(left[0], left[1], top[0],top[1])
-    top_right = find_cross_t(right[0], right[1], top[1],top[0])
-    bottom_left = find_cross_t(left[1], left[0], bottom[0],bottom[1])
-    bottom_right = find_cross_t(right[1], right[0], bottom[1],bottom[0])  
+
+
 
     # Use this https://stackoverflow.com/questions/71724403/crop-an-image-in-pil-using-the-4-points-of-a-rotated-rectangle
     
@@ -130,15 +152,23 @@ def fit_polynomial(p_1, p_2):
     return (coef_1, coef_2)
 
 def process_horisontal(img_array, mode):
-    start_h = 18
+    h = img_array.shape[0]
 
-    top_h = 188
-    bottom_h = 400
+    border = (h - card_h)/2
 
     horisontal_lines = []
 
-    horisontal_lines.append(start_h + int(top_h/2))
-    horisontal_lines.append(start_h + card_h - int(bottom_h/2))
+    top_lines = 3
+    d_top = card_top_part_h/(top_lines+1)
+    for i in range(top_lines):
+        horisontal_lines.append(int(border + (i+1)*d_top))
+
+    bottom_lines = 5
+    d_bottom = card_bottom_part_h/(bottom_lines+1)
+    for i in range(bottom_lines):
+        horisontal_lines.append(int(border + card_h - (i+1)*d_bottom))
+
+    print(horisontal_lines)
     return process_horisontal_lines(img_array, horisontal_lines, mode)
 
 def process_horisontal_lines(img_array, lines, mode):
@@ -147,24 +177,29 @@ def process_horisontal_lines(img_array, lines, mode):
     for line in lines:
         line_slice = img_array[line, :]
         (px1,px2) = find_line_in_slice(line_slice, mode)
-        points_left.append(np.array([line, px1]))
-        points_right.append(np.array([line, px2]))
+        points_left.append(np.array([px1, line]))
+        points_right.append(np.array([px2, line]))
 
     return (points_left, points_right)
 
 def process_vertical(img_array,mode):
-    vertical_lines = []
+    w = img_array.shape[1]
+    
+    border = (w - card_w)/2
 
-    vertical_lines.append(int(card_w/3))
-    vertical_lines.append(int(2*card_w/3))
+    vertical_lines = []
+    v_lines = 5
+    d_v = card_w/(v_lines + 1)
+    for i in range(v_lines):
+        vertical_lines.append(int(border + (i+1)*d_v))
 
     points_top = []
     points_bottom = []
     for line in vertical_lines:
         line_slice = img_array[:, line]
         (px1,px2) = find_line_in_slice(line_slice, mode)
-        points_top.append(np.array([px1, line]))
-        points_bottom.append(np.array([px2, line]))
+        points_top.append(np.array([line, px1 ]))
+        points_bottom.append(np.array([line, px2]))
 
     return (points_top, points_bottom)
 
@@ -194,7 +229,7 @@ def find_line_in_slice(img_slice, mode):
 
 
 if __name__ == '__main__':
-    path = 'img_src\\card_split\\card-168.png'
+    path = 'img_src\\card_split\\FR120.png'
     img = extract_card(Image.open(path))
 
     img.save('test.png')
