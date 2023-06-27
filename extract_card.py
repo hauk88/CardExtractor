@@ -5,30 +5,36 @@ from enum import Enum
 
 def extract_card(image):
     img_array = np.array(image, dtype=np.uint8)
+    # Find small box around card
     (left, right) = process_horisontal(img_array, EdgeMode.COLOR)
     (top, bottom) = process_vertical(img_array, EdgeMode.COLOR)
 
-    d = 10
+    # Define padding around box
+    d_left = 10
+    d_top = 10
+    d_right = 13
+    d_bottom = 15
 
     left_x = [l[0] for l in left]
     rigt_x = [l[0] for l in right]
-
     top_y = [l[1] for l in top]
-    bottom_y = [l[1] for l in bottom]
-    
+    bottom_y = [l[1] for l in bottom] 
 
-    box = [min(left_x)-d, 
-           min(top_y)-d,
-           max(rigt_x)+d,
-           max(bottom_y)+d]
+    box = [min(left_x)-d_left, 
+           min(top_y)-d_top,
+           max(rigt_x)+d_right,
+           max(bottom_y)+d_bottom]
     
     image_box = image.crop(box)
 
+    # Use edge detection on boxed card to find edges
     imgw = image_box.convert("L")
- 
-    # Detecting Edges on the Image using the argument ImageFilter.FIND_EDGES
     imgw = imgw.filter(ImageFilter.FIND_EDGES)
+
+    # Remove 1 px as this is detected as an edge
     box_1px = [1,1,imgw.size[0]-1, imgw.size[1]-1]
+    
+    image_box = image_box.crop(box_1px)
     imgw = imgw.crop(box_1px)
 
     img_array = np.array(imgw, dtype=np.uint8)    
@@ -49,20 +55,42 @@ def extract_card(image):
     draw_points(right)
     draw_points(top)
     draw_points(bottom)
-    return img_test
 
-    image_box = image_box.crop(box_1px)
+    # Find polynomial that fits the points
+    # For left and right we need to swap the points to get a well behaved function
+    c_left,c_right = fit_polynomial(swap_points(left), swap_points(right))
+    c_top,c_bottom = fit_polynomial(top, bottom)
 
+    p_left = np.poly1d(c_left)
+    p_right = np.poly1d(c_right)
+    p_top = np.poly1d(c_top)
+    p_bottom = np.poly1d(c_bottom)
+
+    # Find two points for each line
+    xp = [0, imgw.size[0]]
+    yp = [0, imgw.size[1]]
+
+    top = [np.array([x,p_top(x)]) for x in xp]
+    bottom = [np.array([x,p_bottom(x)]) for x in xp]
+
+    left = [np.array([p_left(y), y]) for y in yp]
+    right = [np.array([p_right(y),y]) for y in yp]
+
+    # img1.line(sum(left,[]), fill="red", width=0)
+    # img1.line([p_right(0),0, p_right(image.size[1]), image.size[1]], fill="red", width=0)
+
+    # img1.line([0,p_top(0), image.size[1], p_top(image.size[1])], fill="red", width=0)
+    # img1.line([0,p_bottom(0), image.size[1], p_bottom(image.size[1])], fill="red", width=0)
+
+    # Use points to find corners of the card
     top_left = find_cross(left[0], left[1], top[0],top[1])
     top_right = find_cross(right[0], right[1], top[1],top[0])
     bottom_left = find_cross(left[1], left[0], bottom[0],bottom[1])
     bottom_right = find_cross(right[1], right[0], bottom[1],bottom[0])
 
-
-
-
-    # Use this https://stackoverflow.com/questions/71724403/crop-an-image-in-pil-using-the-4-points-of-a-rotated-rectangle
+    # Rotate and crop card using corners
     
+    # Use this https://stackoverflow.com/questions/71724403/crop-an-image-in-pil-using-the-4-points-of-a-rotated-rectangle
     # Define 8-tuple with x,y coordinates of top-left, bottom-left, bottom-right and top-right corners and apply
     transform=[*top_left,*bottom_left,*bottom_right, *top_right]
     size = (card_w,card_h)
@@ -168,7 +196,6 @@ def process_horisontal(img_array, mode):
     for i in range(bottom_lines):
         horisontal_lines.append(int(border + card_h - (i+1)*d_bottom))
 
-    print(horisontal_lines)
     return process_horisontal_lines(img_array, horisontal_lines, mode)
 
 def process_horisontal_lines(img_array, lines, mode):
