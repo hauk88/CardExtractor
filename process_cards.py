@@ -5,9 +5,7 @@ from extract_card import extract_card
 from PIL import Image, ImageFilter, ImageDraw
 
 
-def process_cards():
-    path = 'img_src\\card_split\\'
-    target_path = 'img_res\\'
+def process_cards(path, target):
     card_paths = os.listdir(path)
 
     for card_path in card_paths:
@@ -16,7 +14,12 @@ def process_cards():
         img = extract_card(Image.open(full_path))
         img = add_border(img, card_border)
 
-        img.save(target_path+card_path)
+        img.save(target+card_path)
 
 if __name__ == '__main__':
-    process_cards()
+    path = 'img_src\\card_split\\'
+    target = 'img_res\\'
+
+    if not os.path.exists(target):
+        os.mkdir(target)
+    process_cards(path, target)

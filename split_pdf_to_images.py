@@ -17,7 +17,7 @@ def split_pdf_to_pages(path, target):
         images[i].save(target_path, 'JPEG')
 
 
-def split_pdf_to_cards(path, target):
+def split_pdf_to_cards(path, target, names):
     # Store Pdf with convert_from_path function
     logging.debug(f'reading from path {target}')
 
@@ -26,12 +26,12 @@ def split_pdf_to_cards(path, target):
     
     total_count = 0
     for i in range(len(images)):
-        c = split_page_to_card(images[i], target, total_count, i+1)
+        c = split_page_to_card(images[i], target, total_count, i+1, names)
 
         total_count = total_count + c
 
 
-def split_page_to_card(image, target, total_count, page):
+def split_page_to_card(image, target, total_count, page, names):
     cols = [160, 628, 1093, 1558, image.size[0]]
     rows = [0, 719, image.size[1]]
 
@@ -47,16 +47,34 @@ def split_page_to_card(image, target, total_count, page):
             counter = counter + 1
             shape = (cols[j], rows[i], cols[j+1],rows[i+1])
             cropped = image.crop(shape)
-            filename = f'card-{total_count + counter}.png'
-            path = f'{target}{filename}'
+            name = names[total_count + counter-1]
+            path = get_unique_path(target,name, 'png')
             cropped.save(path)
             
     return counter
 
+def get_unique_path(target, name, ext):
+    path = f'{target}{name}.{ext}'
+    counter = 1
+    while os.path.exists(path):
+        path = f'{target}{name}({counter}).{ext}'
+        counter += 1
+    
+    return path
+
+def parse_card_names(path):
+    with open(path) as file:
+        lines = [line.rstrip() for line in file]
+    return lines
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     path = 'img_src\\AgricolaFrWm.pdf'
     target = 'img_src\\card_split\\'
+    card_name_path = 'card_to_name.txt'
 
-    split_pdf_to_cards(path, target)
+    if not os.path.exists(target):
+        os.mkdir(target)
+
+    names = parse_card_names(card_name_path)
+    split_pdf_to_cards(path, target, names)
