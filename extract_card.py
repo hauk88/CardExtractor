@@ -1,7 +1,7 @@
 import numpy as np
 from card_constants import *
 from PIL import Image, ImageFilter, ImageDraw, ImageTransform
-from enum import Enum
+from sklearn.linear_model import HuberRegressor
 
 def extract_card(image):
     img_array = np.array(image, dtype=np.uint8)
@@ -58,8 +58,11 @@ def extract_card(image):
 
     # Find polynomial that fits the points
     # For left and right we need to swap the points to get a well behaved function
-    c_left,c_right = fit_polynomial(swap_points(left), swap_points(right))
-    c_top,c_bottom = fit_polynomial(top, bottom)
+    c_left,c_right = fit_common_polynomial_outliers(swap_points(left), swap_points(right))
+    c_top,c_bottom = fit_common_polynomial_outliers(top, bottom)
+
+    # c_left,c_right = fit_common_polynomial_normal(swap_points(left), swap_points(right))
+    # c_top,c_bottom = fit_common_polynomial_normal(top, bottom)
 
     p_left = np.poly1d(c_left)
     p_right = np.poly1d(c_right)
@@ -76,12 +79,12 @@ def extract_card(image):
     left = [np.array([p_left(y), y]) for y in yp]
     right = [np.array([p_right(y),y]) for y in yp]
 
-    # img1.line(sum(left,[]), fill="red", width=0)
-    # img1.line([p_right(0),0, p_right(image.size[1]), image.size[1]], fill="red", width=0)
+    img1.line([left[0][0], left[0][1],left[1][0], left[1][1]], fill="red", width=0)
+    img1.line([right[0][0], right[0][1],right[1][0], right[1][1]], fill="red", width=0)
+    img1.line([top[0][0], top[0][1],top[1][0], top[1][1]], fill="red", width=0)
+    img1.line([bottom[0][0], bottom[0][1],bottom[1][0], bottom[1][1]], fill="red", width=0)
 
-    # img1.line([0,p_top(0), image.size[1], p_top(image.size[1])], fill="red", width=0)
-    # img1.line([0,p_bottom(0), image.size[1], p_bottom(image.size[1])], fill="red", width=0)
-
+    return img_test
     # Use points to find corners of the card
     top_left = find_cross(left[0], left[1], top[0],top[1])
     top_right = find_cross(right[0], right[1], top[1],top[0])
@@ -102,10 +105,10 @@ def extract_card(image):
 def extract_card_draw(image):
     img_array = np.array(image, dtype=np.uint8)
     (left, right) = process_horisontal(img_array)
-    c_left,c_right = fit_polynomial(left, right)
+    c_left,c_right = fit_common_polynomial_normal(left, right)
 
     (top, bottom) = process_vertical(img_array)
-    c_top,c_bottom = fit_polynomial(swap_points(top), swap_points(bottom))
+    c_top,c_bottom = fit_common_polynomial_normal(swap_points(top), swap_points(bottom))
 
     p_left = np.poly1d(c_left)
     p_right = np.poly1d(c_right)
@@ -168,9 +171,20 @@ def swap_points(p):
         res.append([p[i][1], p[i][0]])
     return res
 
-def fit_polynomial(p_1, p_2):
-    coef_1 = np.polyfit([p[0] for p in p_1], [p[1] for p in p_1], 1)
-    coef_2 = np.polyfit([p[0] for p in p_2], [p[1] for p in p_2], 1)
+def fit_common_polynomial_normal(p_1, p_2):
+    fitter = lambda points: np.polyfit([p[0] for p in points], [p[1] for p in points], 1)
+
+    return fit_common_polynomial(p_1,p_2,fitter)
+
+def fit_common_polynomial_outliers(p_1, p_2):
+    # fitter = lambda points: fit_polynomial_outliers(points)
+
+    return fit_common_polynomial(p_1,p_2,fit_polynomial_outliers)
+
+
+def fit_common_polynomial(p_1, p_2, fitter):
+    coef_1 = fitter(p_1)
+    coef_2 = fitter(p_2)
 
     common_slope = (coef_1[0] + coef_2[0])/2
 
@@ -178,6 +192,28 @@ def fit_polynomial(p_1, p_2):
     coef_2[0] = common_slope
 
     return (coef_1, coef_2)
+
+
+def fit_polynomial_outliers(points):
+    x = np.array([[p[0] for p in points]]).T
+    y = np.array([p[1] for p in points])
+
+    d = np.linalg.norm(y - np.ones(y.shape)*y[0])
+
+    # fit model
+    model = HuberRegressor(epsilon=1.0)
+    model.fit(x, y)
+
+    # do some predictions
+    # tx = np.array([min(x), max(x)])
+    # ty = model.predict(tx)
+
+    # # compute coeffs
+    # a = (ty[1] - ty[0])/(tx[1]-tx[0])
+    # # y0 = ax0 + b 
+    # b = ty[0] - a*tx[0]
+
+    return np.array([model.coef_[0],model.intercept_])
 
 def process_horisontal(img_array, target):
     h = img_array.shape[0]
@@ -212,11 +248,11 @@ def process_horisontal_lines(img_array, lines, target):
 def process_vertical(img_array,target):
     w = img_array.shape[1]
     
-    border = (w - card_w)/2
+    border = (w - card_w + 2*card_corner_size)/2
 
     vertical_lines = []
-    v_lines = 5
-    d_v = card_w/(v_lines + 1)
+    v_lines = 10
+    d_v = (card_w - 2*card_corner_size)/(v_lines + 1)
     for i in range(v_lines):
         vertical_lines.append(int(border + (i+1)*d_v))
 
