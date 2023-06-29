@@ -6,8 +6,8 @@ from enum import Enum
 def extract_card(image):
     img_array = np.array(image, dtype=np.uint8)
     # Find small box around card
-    (left, right) = process_horisontal(img_array, EdgeMode.COLOR)
-    (top, bottom) = process_vertical(img_array, EdgeMode.COLOR)
+    (left, right) = process_horisontal(img_array, np.array(minor_border_color))
+    (top, bottom) = process_vertical(img_array, np.array(minor_border_color))
 
     # Define padding around box
     d_left = 10
@@ -39,8 +39,8 @@ def extract_card(image):
 
     img_array = np.array(imgw, dtype=np.uint8)    
     
-    (left, right) = process_horisontal(img_array, EdgeMode.BW)
-    (top, bottom) = process_vertical(img_array, EdgeMode.BW)
+    (left, right) = process_horisontal(img_array, 255)
+    (top, bottom) = process_vertical(img_array, 255)
 
     img_test = imgw.convert('RGB')
 
@@ -89,7 +89,7 @@ def extract_card(image):
     bottom_right = find_cross(right[1], right[0], bottom[1],bottom[0])
 
     # Rotate and crop card using corners
-    
+
     # Use this https://stackoverflow.com/questions/71724403/crop-an-image-in-pil-using-the-4-points-of-a-rotated-rectangle
     # Define 8-tuple with x,y coordinates of top-left, bottom-left, bottom-right and top-right corners and apply
     transform=[*top_left,*bottom_left,*bottom_right, *top_right]
@@ -179,7 +179,7 @@ def fit_polynomial(p_1, p_2):
 
     return (coef_1, coef_2)
 
-def process_horisontal(img_array, mode):
+def process_horisontal(img_array, target):
     h = img_array.shape[0]
 
     border = (h - card_h)/2
@@ -196,20 +196,20 @@ def process_horisontal(img_array, mode):
     for i in range(bottom_lines):
         horisontal_lines.append(int(border + card_h - (i+1)*d_bottom))
 
-    return process_horisontal_lines(img_array, horisontal_lines, mode)
+    return process_horisontal_lines(img_array, horisontal_lines, target)
 
-def process_horisontal_lines(img_array, lines, mode):
+def process_horisontal_lines(img_array, lines, target):
     points_left = []
     points_right = []
     for line in lines:
         line_slice = img_array[line, :]
-        (px1,px2) = find_line_in_slice(line_slice, mode)
+        (px1,px2) = find_line_in_slice(line_slice, target)
         points_left.append(np.array([px1, line]))
         points_right.append(np.array([px2, line]))
 
     return (points_left, points_right)
 
-def process_vertical(img_array,mode):
+def process_vertical(img_array,target):
     w = img_array.shape[1]
     
     border = (w - card_w)/2
@@ -224,22 +224,13 @@ def process_vertical(img_array,mode):
     points_bottom = []
     for line in vertical_lines:
         line_slice = img_array[:, line]
-        (px1,px2) = find_line_in_slice(line_slice, mode)
+        (px1,px2) = find_line_in_slice(line_slice, target)
         points_top.append(np.array([line, px1 ]))
         points_bottom.append(np.array([line, px2]))
 
     return (points_top, points_bottom)
 
-class EdgeMode(Enum):
-    COLOR = 1
-    BW = 2
-
-def find_line_in_slice(img_slice, mode):
-    threshold = 100
-    if(mode == EdgeMode.COLOR):
-        target_color = np.array(minor_border_color)
-    if(mode == EdgeMode.BW):
-        target_color = 255
+def find_line_in_slice(img_slice, target_color, threshold=100):
 
     idx = []
     for i in range(len(img_slice)):

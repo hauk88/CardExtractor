@@ -14,7 +14,7 @@ def process_cards(path, target):
         img = extract_card(Image.open(full_path))
         img = add_border(img, card_border)
 
-        img.save(target+card_path)
+        img.save(target+card_path.split('.')[0] + '-1.png')
 
 if __name__ == '__main__':
     path = 'img_src\\card_split\\'
