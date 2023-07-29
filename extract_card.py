@@ -177,9 +177,7 @@ def fit_common_polynomial_normal(p_1, p_2):
     return fit_common_polynomial(p_1,p_2,fitter)
 
 def fit_common_polynomial_outliers(p_1, p_2):
-    # fitter = lambda points: fit_polynomial_outliers(points)
-
-    return fit_common_polynomial(p_1,p_2,fit_polynomial_outliers)
+    return fit_common_polynomial(p_1,p_2,fit_polynomial_outliers2)
 
 
 def fit_common_polynomial(p_1, p_2, fitter):
@@ -193,6 +191,30 @@ def fit_common_polynomial(p_1, p_2, fitter):
 
     return (coef_1, coef_2)
 
+
+def fit_polynomial_outliers2(points):
+    x = np.array([p[0] for p in points])
+    y = np.array([p[1] for p in points])
+
+    while True:
+        coef, residuals, rank, singular_values, rcond = np.polyfit(x, y, 1, full=True)
+        print(residuals)
+
+        if residuals < 0.00001:
+            break
+        a = coef[0]
+        b = coef[1]
+
+        point_errors = []
+        for i in range(len(x)):
+            x0 = x[i]
+            y0 = y[i]
+            d = np.abs(b+a*x0-y0)/np.sqrt(1+a**2)
+            point_errors.append(d)
+        idx = np.array(point_errors).argmax()
+        x = np.delete(x,idx)
+        y = np.delete(y,idx)
+    return coef
 
 def fit_polynomial_outliers(points):
     x = np.array([[p[0] for p in points]]).T
@@ -283,7 +305,7 @@ def find_line_in_slice(img_slice, target_color, threshold=100):
 
 
 if __name__ == '__main__':
-    path = 'img_src\\card_split\\FR120.png'
+    path = 'img_src\\card_split\\FR030.png'
     img = extract_card(Image.open(path))
 
     img.save('test.png')
