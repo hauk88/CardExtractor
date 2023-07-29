@@ -58,8 +58,13 @@ def extract_card(image):
 
     # Find polynomial that fits the points
     # For left and right we need to swap the points to get a well behaved function
-    c_left,c_right = fit_common_polynomial_outliers(swap_points(left), swap_points(right))
-    c_top,c_bottom = fit_common_polynomial_outliers(top, bottom)
+    # c_left,c_right = fit_common_polynomial_outliers(swap_points(left), swap_points(right))
+    # c_top,c_bottom = fit_common_polynomial_outliers(top, bottom)
+
+    c_left = fit_polynomial_outliers2(swap_points(left))
+    c_right = fit_polynomial_outliers2(swap_points(right))
+    c_top = fit_polynomial_outliers2(top)
+    c_bottom = fit_polynomial_outliers2(bottom)
 
     # c_left,c_right = fit_common_polynomial_normal(swap_points(left), swap_points(right))
     # c_top,c_bottom = fit_common_polynomial_normal(top, bottom)
@@ -84,7 +89,7 @@ def extract_card(image):
     img1.line([top[0][0], top[0][1],top[1][0], top[1][1]], fill="red", width=0)
     img1.line([bottom[0][0], bottom[0][1],bottom[1][0], bottom[1][1]], fill="red", width=0)
 
-    return img_test
+    # return img_test
     # Use points to find corners of the card
     top_left = find_cross(left[0], left[1], top[0],top[1])
     top_right = find_cross(right[0], right[1], top[1],top[0])
@@ -200,7 +205,7 @@ def fit_polynomial_outliers2(points):
         coef, residuals, rank, singular_values, rcond = np.polyfit(x, y, 1, full=True)
         print(residuals)
 
-        if residuals < 0.00001:
+        if residuals < 0.000001:
             break
         a = coef[0]
         b = coef[1]
@@ -240,19 +245,19 @@ def fit_polynomial_outliers(points):
 def process_horisontal(img_array, target):
     h = img_array.shape[0]
 
-    border = (h - card_h)/2
+    border = (h - card_h)
+    safety = 5
 
-    horisontal_lines = []
+    # Top
+    start = border + card_corner_size + safety
+    end = card_top_part_h - safety
+    horisontal_lines = [i for i in range(start, end, 1)]
 
-    top_lines = 3
-    d_top = card_top_part_h/(top_lines+1)
-    for i in range(top_lines):
-        horisontal_lines.append(int(border + (i+1)*d_top))
-
-    bottom_lines = 5
-    d_bottom = card_bottom_part_h/(bottom_lines+1)
-    for i in range(bottom_lines):
-        horisontal_lines.append(int(border + card_h - (i+1)*d_bottom))
+    # Bottom
+    start = card_h + border - card_bottom_part_h + safety
+    end = card_h - border - card_corner_size - safety
+    for i in range(start, end, 1):
+        horisontal_lines.append(i)
 
     return process_horisontal_lines(img_array, horisontal_lines, target)
 
@@ -270,13 +275,12 @@ def process_horisontal_lines(img_array, lines, target):
 def process_vertical(img_array,target):
     w = img_array.shape[1]
     
-    border = (w - card_w + 2*card_corner_size)/2
+    border = (w - card_w)
+    safety = 5
 
-    vertical_lines = []
-    v_lines = 10
-    d_v = (card_w - 2*card_corner_size)/(v_lines + 1)
-    for i in range(v_lines):
-        vertical_lines.append(int(border + (i+1)*d_v))
+    start = border + card_corner_size + safety
+    end = w - start
+    vertical_lines = [i for i in range(start,end,1)]
 
     points_top = []
     points_bottom = []
