@@ -1,0 +1,6 @@
+*.png
+*.jpg
+*.pdf
+.env
+
+__pycache__
