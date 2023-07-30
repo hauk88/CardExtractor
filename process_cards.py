@@ -1,8 +1,7 @@
 import os
-from add_border import add_border
 from card_constants import *
 from extract_card import extract_card
-from PIL import Image, ImageFilter, ImageDraw
+from PIL import Image
 
 
 def process_cards(path, target):
@@ -12,9 +11,8 @@ def process_cards(path, target):
         print(f'Processing {card_path}')
         full_path = path + card_path
         img = extract_card(Image.open(full_path))
-        img = add_border(img, card_border)
 
-        img.save(target+card_path.split('.')[0] + '-1.png')
+        img.save(target+card_path.split('.')[0] + '.png')
 
 if __name__ == '__main__':
     path = 'img_src\\card_split\\'

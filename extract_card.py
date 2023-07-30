@@ -1,13 +1,13 @@
 import numpy as np
 from card_constants import *
+from polynomial_fitters import *
 from PIL import Image, ImageFilter, ImageDraw, ImageTransform
-from sklearn.linear_model import HuberRegressor
 
-def extract_card(image):
+def extract_card(image, draw=False):
     img_array = np.array(image, dtype=np.uint8)
     # Find small box around card
-    (left, right) = process_horisontal(img_array, np.array(minor_border_color))
-    (top, bottom) = process_vertical(img_array, np.array(minor_border_color))
+    (left, right) = process_horisontal(img_array, np.array(minor_border_color), 100)
+    (top, bottom) = process_vertical(img_array, np.array(minor_border_color), 100)
 
     # Define padding around box
     d_left = 10
@@ -39,35 +39,37 @@ def extract_card(image):
 
     img_array = np.array(imgw, dtype=np.uint8)    
     
-    (left, right) = process_horisontal(img_array, 255)
-    (top, bottom) = process_vertical(img_array, 255)
+    (left, right) = process_horisontal(img_array, 255, 100)
+    (top, bottom) = process_vertical(img_array, 255, 100)
 
-    img_test = imgw.convert('RGB')
+    # Edge detection seem to detect 1px before edge on top and left. Shift to correct
+    for i in range(len(left)):
+        left[i][0] = left[i][0] + 1
 
-    img1 = ImageDraw.Draw(img_test)
+    for i in range(len(top)):
+        top[i][1] = top[i][1] + 1
 
-    def draw_points(points):
-        w = 2
-        for p in points:
-            img1.ellipse((round(p[0])-w, round(p[1])-w,round(p[0])+w,round(p[1])+w), fill='green')
-    
-    draw_points(left)
-    draw_points(right)
-    draw_points(top)
-    draw_points(bottom)
+    if draw:
+        img_test = imgw.convert('RGB')
+
+        img1 = ImageDraw.Draw(img_test)
+
+        def draw_points(points):
+            w = 1
+            for p in points:
+                img1.ellipse((round(p[0])-w, round(p[1])-w,round(p[0])+w,round(p[1])+w), fill='green')
+
+        draw_points(left)
+        draw_points(right)
+        draw_points(top)
+        draw_points(bottom)
 
     # Find polynomial that fits the points
     # For left and right we need to swap the points to get a well behaved function
-    # c_left,c_right = fit_common_polynomial_outliers(swap_points(left), swap_points(right))
-    # c_top,c_bottom = fit_common_polynomial_outliers(top, bottom)
-
-    c_left = fit_polynomial_outliers2(swap_points(left))
-    c_right = fit_polynomial_outliers2(swap_points(right))
-    c_top = fit_polynomial_outliers2(top)
-    c_bottom = fit_polynomial_outliers2(bottom)
-
-    # c_left,c_right = fit_common_polynomial_normal(swap_points(left), swap_points(right))
-    # c_top,c_bottom = fit_common_polynomial_normal(top, bottom)
+    c_left = fit_polynomial_outliers_iterative(swap_points(left))
+    c_right = fit_polynomial_outliers_iterative(swap_points(right))
+    c_top = fit_polynomial_outliers_iterative(top)
+    c_bottom = fit_polynomial_outliers_iterative(bottom)
 
     p_left = np.poly1d(c_left)
     p_right = np.poly1d(c_right)
@@ -84,12 +86,13 @@ def extract_card(image):
     left = [np.array([p_left(y), y]) for y in yp]
     right = [np.array([p_right(y),y]) for y in yp]
 
-    img1.line([left[0][0], left[0][1],left[1][0], left[1][1]], fill="red", width=0)
-    img1.line([right[0][0], right[0][1],right[1][0], right[1][1]], fill="red", width=0)
-    img1.line([top[0][0], top[0][1],top[1][0], top[1][1]], fill="red", width=0)
-    img1.line([bottom[0][0], bottom[0][1],bottom[1][0], bottom[1][1]], fill="red", width=0)
+    if draw:
+        img1.line([left[0][0], left[0][1],left[1][0], left[1][1]], fill="red", width=0)
+        img1.line([right[0][0], right[0][1],right[1][0], right[1][1]], fill="red", width=0)
+        img1.line([top[0][0], top[0][1],top[1][0], top[1][1]], fill="red", width=0)
+        img1.line([bottom[0][0], bottom[0][1],bottom[1][0], bottom[1][1]], fill="red", width=0)
+        return img_test
 
-    # return img_test
     # Use points to find corners of the card
     top_left = find_cross(left[0], left[1], top[0],top[1])
     top_right = find_cross(right[0], right[1], top[1],top[0])
@@ -106,49 +109,6 @@ def extract_card(image):
     result = image_box.transform(size, ImageTransform.QuadTransform(transform), resample=Image.Resampling.BICUBIC)
     
     return result
-
-def extract_card_draw(image):
-    img_array = np.array(image, dtype=np.uint8)
-    (left, right) = process_horisontal(img_array)
-    c_left,c_right = fit_common_polynomial_normal(left, right)
-
-    (top, bottom) = process_vertical(img_array)
-    c_top,c_bottom = fit_common_polynomial_normal(swap_points(top), swap_points(bottom))
-
-    p_left = np.poly1d(c_left)
-    p_right = np.poly1d(c_right)
-    p_top = np.poly1d(c_top)
-    p_bottom = np.poly1d(c_bottom)
-
-
-    img1 = ImageDraw.Draw(image)
-
-
-
-    img1.line([p_left(0),0, p_left(image.size[1]), image.size[1]], fill="red", width=0)
-    img1.line([p_right(0),0, p_right(image.size[1]), image.size[1]], fill="red", width=0)
-
-    img1.line([0,p_top(0), image.size[1], p_top(image.size[1])], fill="red", width=0)
-    img1.line([0,p_bottom(0), image.size[1], p_bottom(image.size[1])], fill="red", width=0)
-
-    def draw_points(points):
-        w = 2
-        for p in points:
-            img1.ellipse((round(p[1])-w, round(p[0])-w,round(p[1])+w,round(p[0])+w), fill='green')
-
-    draw_points(left)
-    draw_points(right)
-    draw_points(top)
-    draw_points(bottom)
-
-    corners = [find_cross(left[0], left[1], top[0],top[1]),
-               find_cross(right[0], right[1], top[1],top[0]),
-               find_cross(left[1], left[0], bottom[0],bottom[1]),
-               find_cross(right[1], right[0], bottom[1],bottom[0])]
-
-    draw_points(corners)
-    
-    return image
 
 def find_cross(p1,p2,q1,q2):
     # p(t) = a*t + b
@@ -176,73 +136,7 @@ def swap_points(p):
         res.append([p[i][1], p[i][0]])
     return res
 
-def fit_common_polynomial_normal(p_1, p_2):
-    fitter = lambda points: np.polyfit([p[0] for p in points], [p[1] for p in points], 1)
-
-    return fit_common_polynomial(p_1,p_2,fitter)
-
-def fit_common_polynomial_outliers(p_1, p_2):
-    return fit_common_polynomial(p_1,p_2,fit_polynomial_outliers2)
-
-
-def fit_common_polynomial(p_1, p_2, fitter):
-    coef_1 = fitter(p_1)
-    coef_2 = fitter(p_2)
-
-    common_slope = (coef_1[0] + coef_2[0])/2
-
-    coef_1[0] = common_slope
-    coef_2[0] = common_slope
-
-    return (coef_1, coef_2)
-
-
-def fit_polynomial_outliers2(points):
-    x = np.array([p[0] for p in points])
-    y = np.array([p[1] for p in points])
-
-    while True:
-        coef, residuals, rank, singular_values, rcond = np.polyfit(x, y, 1, full=True)
-        print(residuals)
-
-        if residuals < 0.000001:
-            break
-        a = coef[0]
-        b = coef[1]
-
-        point_errors = []
-        for i in range(len(x)):
-            x0 = x[i]
-            y0 = y[i]
-            d = np.abs(b+a*x0-y0)/np.sqrt(1+a**2)
-            point_errors.append(d)
-        idx = np.array(point_errors).argmax()
-        x = np.delete(x,idx)
-        y = np.delete(y,idx)
-    return coef
-
-def fit_polynomial_outliers(points):
-    x = np.array([[p[0] for p in points]]).T
-    y = np.array([p[1] for p in points])
-
-    d = np.linalg.norm(y - np.ones(y.shape)*y[0])
-
-    # fit model
-    model = HuberRegressor(epsilon=1.0)
-    model.fit(x, y)
-
-    # do some predictions
-    # tx = np.array([min(x), max(x)])
-    # ty = model.predict(tx)
-
-    # # compute coeffs
-    # a = (ty[1] - ty[0])/(tx[1]-tx[0])
-    # # y0 = ax0 + b 
-    # b = ty[0] - a*tx[0]
-
-    return np.array([model.coef_[0],model.intercept_])
-
-def process_horisontal(img_array, target):
+def process_horisontal(img_array, target, threshold):
     h = img_array.shape[0]
 
     border = (h - card_h)
@@ -259,20 +153,20 @@ def process_horisontal(img_array, target):
     for i in range(start, end, 1):
         horisontal_lines.append(i)
 
-    return process_horisontal_lines(img_array, horisontal_lines, target)
+    return process_horisontal_lines(img_array, horisontal_lines, target, threshold)
 
-def process_horisontal_lines(img_array, lines, target):
+def process_horisontal_lines(img_array, lines, target, threshold):
     points_left = []
     points_right = []
     for line in lines:
         line_slice = img_array[line, :]
-        (px1,px2) = find_line_in_slice(line_slice, target)
+        (px1,px2) = find_line_in_slice(line_slice, target, threshold)
         points_left.append(np.array([px1, line]))
         points_right.append(np.array([px2, line]))
 
     return (points_left, points_right)
 
-def process_vertical(img_array,target):
+def process_vertical(img_array,target, threshold):
     w = img_array.shape[1]
     
     border = (w - card_w)
@@ -286,7 +180,7 @@ def process_vertical(img_array,target):
     points_bottom = []
     for line in vertical_lines:
         line_slice = img_array[:, line]
-        (px1,px2) = find_line_in_slice(line_slice, target)
+        (px1,px2) = find_line_in_slice(line_slice, target, threshold)
         points_top.append(np.array([line, px1 ]))
         points_bottom.append(np.array([line, px2]))
 
@@ -309,7 +203,7 @@ def find_line_in_slice(img_slice, target_color, threshold=100):
 
 
 if __name__ == '__main__':
-    path = 'img_src\\card_split\\FR030.png'
-    img = extract_card(Image.open(path))
+    path = 'img_src\\card_split\\FR003.png'
+    img = extract_card(Image.open(path), draw=False)
 
     img.save('test.png')
