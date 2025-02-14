@@ -1,0 +1,26 @@
+{
+  "brushwood_roof": {
+    "top_left": [33, 21],
+    "top_right": [1062, 28],
+    "bottom_left": [33, 1659],
+    "bottom_right": [1046, 1653]
+  },
+  "horse": {
+    "top_left": [33, 30],
+    "top_right": [1075, 36],
+    "bottom_left": [35, 1695],
+    "bottom_right": [1070, 1690]
+  },
+  "moldboard_plow": {
+    "top_left": [18, 32],
+    "top_right": [1080, 35],
+    "bottom_left": [15, 1723],
+    "bottom_right": [1068, 1732]
+  },
+  "swineherd": {
+    "top_left": [24, 26],
+    "top_right": [1076, 22],
+    "bottom_left": [24, 1710],
+    "bottom_right": [1076, 1711]
+  }
+}
